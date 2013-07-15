@@ -667,7 +667,10 @@ fn cty_to_rs(ctx: &mut GenCtx, ty: @Type) -> ast::Ty {
         TEnum(ei) => {
             ei.name = unnamed_name(ctx, copy ei.name);
             mk_ty(ctx, enum_name(copy ei.name))
-        }
+        },
+		TMemberFunc(_,_,_,_) => {
+			mk_ty(ctx,~"c_void")
+		}
     };
 }
 

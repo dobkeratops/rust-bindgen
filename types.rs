@@ -11,18 +11,42 @@ pub enum Global {
     GOther
 }
 
+
+pub type ReturnType=Type;
+pub type ReceiverType=Type;
+pub type ArgType=Type;
+pub type ArgInfo=(~str,@ArgType);
+pub type FuncInfo=(@ReturnType,~str,~[ArgInfo],bool);
+
 pub enum Type {
     TVoid,
     TInt(IKind),
     TFloat(FKind),
     TPtr(@Type, bool),
     TArray(@Type, uint),
-    TFunc(@Type, ~[(~str, @Type)], bool),
+    TFunc(@ReturnType,		~[ArgInfo],	bool),
+	TMemberFunc(@ReturnType,	@ReceiverType,~[ArgInfo],	bool),
     TNamed(@mut TypeInfo),
     TComp(@mut CompInfo),
     TEnum(@mut EnumInfo)
 }
+//?? didn't work as impl ToStr for Type ?
+impl Type {
+	pub fn to_str(@self)->~str {
+		match self {
+			@TVoid => ~"void-to_str_TODO",
+			@TInt(k) => ~"Int-to_str_TODO",
+			@TFloat(k) => ~"Float-to_str_TODO",
+			@TPtr(k,b) => ~"Ptr-to_str_TODO",
 
+			@TMemberFunc(ref rett,ref rect,ref args,ref var)=>
+				~"MemberFunction-to_str_TODO",
+			_ =>~"Type-to_str_TODO"
+		}	
+	}
+}
+
+#[deriving(ToStr)]
 pub enum IKind {
     IBool,
     ISChar,
@@ -37,16 +61,26 @@ pub enum IKind {
     IULongLong
 }
 
+#[deriving(ToStr)]
 pub enum FKind {
     FFloat,
     FDouble
 }
 
+pub struct MethodInfo {
+	return_type:~str,
+	name:~str,
+	args:~[@ArgInfo]
+}
+
+
 pub struct CompInfo {
     cstruct: bool,
     name: ~str,
     fields: ~[@FieldInfo]
+//	methods: ~[~MethodInfo]
 }
+
 
 pub struct FieldInfo {
     name: ~str,
@@ -54,11 +88,13 @@ pub struct FieldInfo {
     bit: Option<uint>
 }
 
+
 pub struct EnumInfo {
     name: ~str,
     items: ~[@EnumItem],
     kind: IKind
 }
+
 
 pub struct EnumItem {
     name: ~str,
@@ -118,6 +154,7 @@ pub fn mk_compinfo(name: ~str, cstruct: bool, fields: ~[@FieldInfo]) -> @mut Com
     return @mut CompInfo { cstruct: cstruct,
                            name: name,
                            fields: fields
+//							methods: ~[]
                          };
 }
 
@@ -209,7 +246,8 @@ pub fn type_align(ty: @Type) -> uint {
         },
         TEnum(_) => 4,
         TVoid => 0,
-        TFunc(_, _, _) => 0
+        TFunc(_, _, _) => 0,
+        TMemberFunc(_,_,_,_) => 0,
     };
 }
 
@@ -274,7 +312,8 @@ pub fn type_size(ty: @Type) -> uint {
         },
         TEnum(_) => 4,
         TVoid => 0,
-        TFunc(_, _, _) => 0
+        TFunc(_, _, _) => 0,
+		TMemberFunc(_,_,_,_)=>0
     };
 }
 

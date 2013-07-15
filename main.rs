@@ -317,15 +317,46 @@ fn opaque_ty(ctx: @mut BindGenCtx, ty: &cx::Type) {
     }
 }
 
+fn read_function_args(cursor: &Cursor, ctx: @mut BindGenCtx)->~[ArgInfo] {
+	do cursor.args().map |arg| {
+        let arg_name = arg.spelling();
+        (arg_name, conv_ty(ctx, &arg.cur_type(), cursor))
+    }
+}
+
+fn debug_show_args(args:~[ArgInfo]) {
+	// TODO - use more idiomatic rust iteration
+	println(fmt!("\tnum args = %u\n", args.len()));
+	let mut i=0;
+	while i<args.len() {
+		let (ref argName,argType)=args[i];
+		println(fmt!("\t\targ %u %s:%s\n",i,*argName,argType.to_str()));
+		i+=1;
+	}
+}
 fn visit_struct(cursor: &Cursor,
                 ctx: @mut BindGenCtx,
-                fields: &mut ~[@FieldInfo]) -> Enum_CXVisitorResult {
-    if cursor.kind() == CXCursor_FieldDecl {
-        let ty = conv_ty(ctx, &cursor.cur_type(), cursor);
-        let name = cursor.spelling();
-        let field = mk_fieldinfo(name, ty, None);
-        fields.push(field);
-    }
+                fields: &mut ~[@FieldInfo]
+//				methods: &mut ~[~MethodInfo]
+				) -> Enum_CXVisitorResult {
+	match cursor.kind() {
+    	CXCursor_FieldDecl=>{
+		    let ty = conv_ty(ctx, &cursor.cur_type(), cursor);
+		    let name = cursor.spelling();
+		    let field = mk_fieldinfo(name, ty, None);
+		    fields.push(field);
+		}
+		CXCursor_CXXMethod=>{
+			use types::*;
+			println(fmt!("\tmember function %s\n", cursor.spelling()));
+			let args = read_function_args(cursor, ctx);
+			debug_show_args(args);
+
+		}
+		_=>{
+			println(fmt!("\tstruct member unknown %s\n", cursor.spelling()));
+		}
+	}
     return CXChildVisit_Continue;
 }
 
@@ -354,7 +385,8 @@ fn visit_enum(cursor: &Cursor,
 
 fn visit_top<'r>(cur: &'r Cursor,
                  parent: &'r Cursor,
-                 ctx: @mut BindGenCtx) -> Enum_CXVisitorResult {
+                 ctx: @mut BindGenCtx,
+                 depth:uint) -> Enum_CXVisitorResult {
     let cursor = if ctx.builtin_names.contains(&parent.spelling()) {
         parent
     } else {
@@ -364,13 +396,16 @@ fn visit_top<'r>(cur: &'r Cursor,
     if !match_pattern(ctx, cursor) {
         return CXChildVisit_Continue;
     }
+	let mut indent= ~"";
+	for depth.times { indent.append("\t");}
 
+	println(fmt!("%svisit -%s\n", indent,cursor.spelling()));
     match cursor.kind() {
       CXCursor_StructDecl => {
         do fwd_decl(ctx, cursor) || {
             let decl = decl_name(ctx, cursor);
             let ci = global_compinfo(decl);
-            cursor.visit(|c, _| visit_struct(c, ctx, &mut ci.fields));
+            cursor.visit(|c, _| visit_struct(c, ctx, &mut ci.fields/*, &mut ci.methods*/));
             ctx.globals.push(GComp(ci));
         }
         return if cur.kind() == CXCursor_FieldDecl {
@@ -403,11 +438,7 @@ fn visit_top<'r>(cur: &'r Cursor,
             return CXChildVisit_Continue;
         }
 
-        let args_lst = do cursor.args().map |arg| {
-            let arg_name = arg.spelling();
-            (arg_name, conv_ty(ctx, &arg.cur_type(), cursor))
-        };
-
+        let args_lst = read_function_args(cursor,ctx);
         let ty = cursor.cur_type();
         let ret_ty = conv_ty(ctx, &cursor.ret_type(), cursor);
 
@@ -485,11 +516,11 @@ fn main() {
             }
 
             let cursor = unit.cursor();
-            cursor.visit(|cur, parent| visit_top(cur, parent, ctx));
+            cursor.visit(|cur, parent| visit_top(cur, parent, ctx,0));
                 
             while !ctx.builtin_defs.is_empty() {
                 let c = ctx.builtin_defs.shift();
-                c.visit(|cur, parent| visit_top(cur, parent, ctx));
+                c.visit(|cur, parent| visit_top(cur, parent, ctx,0));
             }
 
             gen_rs(ctx.out, &ctx.link, ctx.globals);
