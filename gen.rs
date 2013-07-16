@@ -96,16 +96,16 @@ fn enum_name(name: ~str) -> ~str {
 pub fn methods_to_impl_rs(ctx:&mut GenCtx, ci:&CompInfo)-> ~ast::item_ {
 	let self_ty = mk_ty(ctx, struct_name(copy ci.name));
 
-	let methods = do ci.methods.map |&x| {
+	let methods = do ci.methods.map |&m| {
 		// TODO - we're cut pasting here :(
 		// generate propper function body ...
 		// TODO- not convinced this isn't easier generating text..
 		// but with the ast, if it changes..
-		let method_args=~[];
+		let method_args=cfunc_args_to_rs(ctx, &m.args);
 		
 		let _fn_decl = ast::fn_decl{
 			inputs:method_args,// method args
-			output: cty_to_rs(ctx, x.return_type),
+			output: cty_to_rs(ctx, m.return_type),
 			cf:ast::return_val
 		};
 		// TODO: Function Body for method wrapped in impl should call the object...
@@ -120,7 +120,7 @@ pub fn methods_to_impl_rs(ctx:&mut GenCtx, ci:&CompInfo)-> ~ast::item_ {
         });
 
 		@ast::method{
-			ident:ctx.ext_cx.ident_of(x.name),
+			ident:ctx.ext_cx.ident_of(m.name),
 			attrs:~[],
 			generics:ast::Generics{lifetimes:opt_vec::Empty,ty_params:opt_vec::Empty},
 			explicit_self: dummy_spanned(ast::sty_region(None, ast::m_mutbl)),	// means &'??? self
@@ -646,11 +646,45 @@ fn cvar_to_rs(ctx: &mut GenCtx, name: ~str, ty: @Type) -> @ast::foreign_item {
            };
 }
 
-/*
-fn cfunc_args_to_rs(ctx:&mut GenCtx, args:~[(~str,@Type)]) ->~[arg] {
-	
+
+fn cfunc_args_to_rs(ctx:&mut GenCtx, src_args:&~[(~str,@Type)]) ->~[ast::arg] {
+    let mut unnamed = 0;
+    let rs_args = do src_args.map |arg| {
+		let (n, t) = copy *arg;
+
+		let arg_name = if n.is_empty() {
+		    unnamed += 1;
+		    fmt!("arg%u", unnamed)
+		} else {
+		    rust_id(ctx, n).first()
+		};
+
+		let arg_ty = cty_to_rs(ctx, t);
+
+		ast::arg {
+		    is_mutbl: false,
+		    ty: arg_ty,
+		    pat: @ast::pat {
+		         id: ctx.ext_cx.next_id(),
+		         node: ast::pat_ident(
+		             ast::bind_infer,
+		             ast::Path {
+		                 span: dummy_sp(),
+		                 global: false,
+		                 idents: ~[ctx.ext_cx.ident_of(arg_name)],
+		                 rp: None,
+		                 types: ~[]
+		             },
+		             None
+		         ),
+		         span: dummy_sp()
+		    },
+		    id: ctx.ext_cx.next_id()
+		}
+	};
+	rs_args
 }
-*/
+
 
 fn cfunc_to_rs(ctx: &mut GenCtx, name: ~str, rty: @Type,
                                          aty: ~[(~str, @Type)],
@@ -664,44 +698,10 @@ fn cfunc_to_rs(ctx: &mut GenCtx, name: ~str, rty: @Type,
         _ => cty_to_rs(ctx, rty)
     };
 
-    let mut unnamed = 0;
-    let args = do aty.map |arg| {
-        let (n, t) = copy *arg;
-
-        let arg_name = if n.is_empty() {
-            unnamed += 1;
-            fmt!("arg%u", unnamed)
-        } else {
-            rust_id(ctx, n).first()
-        };
-
-        let arg_ty = cty_to_rs(ctx, t);
-
-        ast::arg {
-            is_mutbl: false,
-            ty: arg_ty,
-            pat: @ast::pat {
-                 id: ctx.ext_cx.next_id(),
-                 node: ast::pat_ident(
-                     ast::bind_infer,
-                     ast::Path {
-                         span: dummy_sp(),
-                         global: false,
-                         idents: ~[ctx.ext_cx.ident_of(arg_name)],
-                         rp: None,
-                         types: ~[]
-                     },
-                     None
-                 ),
-                 span: dummy_sp()
-            },
-            id: ctx.ext_cx.next_id()
-        }
-    };
 
     let decl = ast::foreign_item_fn(
         ast::fn_decl {
-            inputs: args,
+            inputs: cfunc_args_to_rs(ctx,&aty),
             output: ret,
             cf: ast::return_val
         },
