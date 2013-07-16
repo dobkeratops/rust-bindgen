@@ -93,15 +93,55 @@ fn enum_name(name: ~str) -> ~str {
 }
 */
 
+
+fn mk_fcall(ctx:&mut GenCtx, fn_name:&str, args:~[@ast::expr])->ast::expr {
+	//dblog!("num of arguments=%u\n",args.len());
+	let call=
+		~ast::expr_call(
+			@mk_expr(ctx,
+				~ast::expr_path(
+//					mk_expr_ident(ctx,fn_name)
+					ast::Path{
+						span:dummy_sp(),	
+						global:false,
+						idents:~[ctx.ext_cx.ident_of(fn_name)],
+						rp:None,
+						types:~[]
+					}
+				)
+			),
+//			do args.map|a|{let arg=a; @arg},
+			args,
+			ast::NoSugar
+		);
+	mk_expr(ctx,call)
+}
+
+fn mk_expr_ident(ctx:&mut GenCtx, name:&str)->@ast::expr {
+	@mk_expr(ctx,
+				~ast::expr_path(
+					ast::Path{
+						span:dummy_sp(),
+						global:false,
+						idents:~[ctx.ext_cx.ident_of(name)],
+						rp:None,types:~[]}
+				)
+			)
+}
+
 pub fn methods_to_impl_rs(ctx:&mut GenCtx, ci:&CompInfo)-> ~ast::item_ {
 	let self_ty = mk_ty(ctx, struct_name(copy ci.name));
 
 	let methods = do ci.methods.map |&m| {
+		//dblog!("method %s num of arguments=%u\n",m.name, m.args.len());
 		// TODO - we're cut pasting here :(
 		// generate propper function body ...
 		// TODO- not convinced this isn't easier generating text..
 		// but with the ast, if it changes..
 		let method_args=cfunc_args_to_rs(ctx, &m.args);
+		let method_arg_exprs=do m.args.map|&(ref name,_)|{
+			mk_expr_ident(ctx, *name)
+		};
 		
 		let _fn_decl = ast::fn_decl{
 			inputs:method_args,// method args
@@ -111,10 +151,14 @@ pub fn methods_to_impl_rs(ctx:&mut GenCtx, ci:&CompInfo)-> ~ast::item_ {
 		// TODO: Function Body for method wrapped in impl should call the object...
 		// ... pass through of self plus method args to the C function...
 		// 
+//		let _self = mk_expr_symbol(ctx,&~"self");
+		let _self = mk_expr(ctx,~ast::expr_self);
+		let e = mk_fcall(ctx, ci.name+&"_"+m.name, [@_self]+method_arg_exprs);
+
         let body = dummy_spanned(ast::blk_ {
             view_items: ~[],
             stmts: ~[],
-            expr: None,
+            expr: Some(@e),
             id: ctx.ext_cx.next_id(),
             rules: ast::default_blk
         });
@@ -685,6 +729,13 @@ fn cfunc_args_to_rs(ctx:&mut GenCtx, src_args:&~[(~str,@Type)]) ->~[ast::arg] {
 	rs_args
 }
 
+fn mk_expr(ctx:&mut GenCtx, e:~ast::expr_)->ast::expr {
+	ast::expr{
+		id:ctx.ext_cx.next_id(),
+		node:*e,
+		span:dummy_sp()
+	}
+}
 
 fn cfunc_to_rs(ctx: &mut GenCtx, name: ~str, rty: @Type,
                                          aty: ~[(~str, @Type)],
