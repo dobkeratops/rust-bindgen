@@ -75,6 +75,84 @@ fn union_name(name: ~str) -> ~str {
 fn enum_name(name: ~str) -> ~str {
     fmt!("Enum_%s", name)
 }
+//pub fn append_inplace( dst:&mut ~str, src:&str) {
+//	dst=dst.append(src);
+//}
+
+/*debug_show_methods
+	if ci.methods.len()>0 {
+		let mut txt=~"impl " + ci.name + " {\n";
+		for ci.methods.iter().advance |m| {
+			txt=txt.append("\t"+m.name+"\n");
+		}
+		txt=txt.append("}\n");
+		txt
+	} else {
+		~""
+	}
+}
+*/
+
+pub fn methods_to_impl_rs(ctx:&mut GenCtx, ci:&CompInfo)-> ~ast::item_ {
+	let self_ty = mk_ty(ctx, struct_name(copy ci.name));
+
+	let methods = do ci.methods.map |&x| {
+		// TODO - we're cut pasting here :(
+		// generate propper function body ...
+		// TODO- not convinced this isn't easier generating text..
+		// but with the ast, if it changes..
+		let method_args=~[];
+		
+		let _fn_decl = ast::fn_decl{
+			inputs:method_args,// method args
+			output: cty_to_rs(ctx, x.return_type),
+			cf:ast::return_val
+		};
+		// TODO: Function Body for method wrapped in impl should call the object...
+		// ... pass through of self plus method args to the C function...
+		// 
+        let body = dummy_spanned(ast::blk_ {
+            view_items: ~[],
+            stmts: ~[],
+            expr: None,
+            id: ctx.ext_cx.next_id(),
+            rules: ast::default_blk
+        });
+
+		@ast::method{
+			ident:ctx.ext_cx.ident_of(x.name),
+			attrs:~[],
+			generics:ast::Generics{lifetimes:opt_vec::Empty,ty_params:opt_vec::Empty},
+			explicit_self: dummy_spanned(ast::sty_region(None, ast::m_mutbl)),	// means &'??? self
+			purity:ast::unsafe_fn,								// unsafe because its a C/C++ function? .. or wrap safe..
+			decl:_fn_decl,
+			body:body,
+			id:ctx.ext_cx.next_id(),
+			span:dummy_sp(),
+			self_id: ctx.ext_cx.next_id(), // what is this???
+			vis: ast::public
+		}
+	};
+
+	let root_item = ~ast::item_impl(
+					ast::Generics{lifetimes:opt_vec::Empty,ty_params:opt_vec::Empty},/* Generics */
+					None,	/* trait_ref */
+					self_ty,/* type of this */
+					methods	/* methods go here... */
+			);
+	root_item
+}
+
+fn mk_item(ctx:&mut GenCtx, name:&str, item: &ast::item_)->@ast::item {
+	@ast::item {
+		ident: ctx.ext_cx.ident_of(name),
+		attrs:~[],
+		id: ctx.ext_cx.next_id(),
+		node: copy *item,	
+		vis:	ast::public,
+		span: dummy_sp()
+	}
+}
 
 pub fn gen_rs(out: @io::Writer, link: &Option<~str>, globs: &[Global]) {
     let mut ctx = GenCtx { ext_cx: base::ExtCtxt::new(parse::new_parse_sess(None), ~[]),
@@ -95,6 +173,9 @@ pub fn gen_rs(out: @io::Writer, link: &Option<~str>, globs: &[Global]) {
     }
 
     let mut defs = ~[];
+	let mut methods=~[];
+	let mut impls=~[];
+
     gs = remove_redundent_decl(gs);
 
     for gs.iter().advance |g| {
@@ -117,6 +198,18 @@ pub fn gen_rs(out: @io::Writer, link: &Option<~str>, globs: &[Global]) {
                     defs.push_all(cunion_to_rs(&mut ctx, union_name(copy ci.name),
                                                copy ci.fields))
                 }
+				for ci.methods.iter().advance |m| {
+					methods.push(
+						cfunc_to_rs(
+							&mut ctx,
+							copy ci.name+"_"+copy m.name,
+							m.return_type,
+							copy m.args,	// TODO .. & ptr surely ?
+							false
+						)
+					)
+				}
+				impls.push(methods_to_impl_rs(&mut ctx,&*ci));
             },
             GEnumDecl(ei) => {
                 ei.name = unnamed_name(&mut ctx, copy ei.name);
@@ -152,7 +245,11 @@ pub fn gen_rs(out: @io::Writer, link: &Option<~str>, globs: &[Global]) {
     };
 
     let views = ~[mk_import(&mut ctx, &[~"std", ~"libc"])];
-    defs.push(mk_extern(&mut ctx, link, vars, funcs));
+    defs.push(mk_extern(&mut ctx, link, vars, funcs+methods));
+
+	for impls.iter().advance|x| {
+		defs.push(mk_item(&mut ctx,"",*x));
+	}
 
     let crate = @dummy_spanned(ast::crate_ {
         module: ast::_mod {
@@ -548,6 +645,12 @@ fn cvar_to_rs(ctx: &mut GenCtx, name: ~str, ty: @Type) -> @ast::foreign_item {
               vis: ast::public,
            };
 }
+
+/*
+fn cfunc_args_to_rs(ctx:&mut GenCtx, args:~[(~str,@Type)]) ->~[arg] {
+	
+}
+*/
 
 fn cfunc_to_rs(ctx: &mut GenCtx, name: ~str, rty: @Type,
                                          aty: ~[(~str, @Type)],

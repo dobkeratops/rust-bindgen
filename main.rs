@@ -324,7 +324,7 @@ fn read_function_args(cursor: &Cursor, ctx: @mut BindGenCtx)->~[ArgInfo] {
     }
 }
 
-fn debug_show_args(args:~[ArgInfo]) {
+fn debug_show_args(args:&[ArgInfo]) {
 	// TODO - use more idiomatic rust iteration
 	println(fmt!("\tnum args = %u\n", args.len()));
 	let mut i=0;
@@ -336,22 +336,27 @@ fn debug_show_args(args:~[ArgInfo]) {
 }
 fn visit_struct(cursor: &Cursor,
                 ctx: @mut BindGenCtx,
-                fields: &mut ~[@FieldInfo]
-//				methods: &mut ~[~MethodInfo]
+				ci: &mut CompInfo
 				) -> Enum_CXVisitorResult {
+    let name = cursor.spelling();
 	match cursor.kind() {
     	CXCursor_FieldDecl=>{
 		    let ty = conv_ty(ctx, &cursor.cur_type(), cursor);
-		    let name = cursor.spelling();
 		    let field = mk_fieldinfo(name, ty, None);
-		    fields.push(field);
+		    ci.fields.push(field);
 		}
 		CXCursor_CXXMethod=>{
 			use types::*;
 			println(fmt!("\tmember function %s\n", cursor.spelling()));
 			let args = read_function_args(cursor, ctx);
 			debug_show_args(args);
-
+			ci.methods.push(//mk_methodinfo(ty,name,args)
+				@MethodInfo{
+					return_type:conv_ty(ctx, &cursor.ret_type(), cursor),
+					name:name,
+					args:args
+				}
+			);
 		}
 		_=>{
 			println(fmt!("\tstruct member unknown %s\n", cursor.spelling()));
@@ -362,12 +367,13 @@ fn visit_struct(cursor: &Cursor,
 
 fn visit_union(cursor: &Cursor,
                ctx: @mut BindGenCtx,
-               fields: &mut ~[@FieldInfo]) -> Enum_CXVisitorResult {
+				ci: &mut CompInfo
+               /*fields: &mut ~[@FieldInfo]*/) -> Enum_CXVisitorResult {
     if cursor.kind() == CXCursor_FieldDecl {
         let ty = conv_ty(ctx, &cursor.cur_type(), cursor);
         let name = cursor.spelling();
         let field = mk_fieldinfo(name, ty, None);
-        fields.push(field);
+        ci.fields.push(field);
     }
     return CXChildVisit_Continue;
 }
@@ -405,7 +411,7 @@ fn visit_top<'r>(cur: &'r Cursor,
         do fwd_decl(ctx, cursor) || {
             let decl = decl_name(ctx, cursor);
             let ci = global_compinfo(decl);
-            cursor.visit(|c, _| visit_struct(c, ctx, &mut ci.fields/*, &mut ci.methods*/));
+            cursor.visit(|c, _| visit_struct(c, ctx, ci));
             ctx.globals.push(GComp(ci));
         }
         return if cur.kind() == CXCursor_FieldDecl {
@@ -418,7 +424,7 @@ fn visit_top<'r>(cur: &'r Cursor,
         do fwd_decl(ctx, cursor) || {
             let decl = decl_name(ctx, cursor);
             let ci = global_compinfo(decl);
-            cursor.visit(|c, _| visit_union(c, ctx, &mut ci.fields));
+            cursor.visit(|c, _| visit_union(c, ctx, ci));
             ctx.globals.push(GComp(ci));
         }
         return CXChildVisit_Recurse;

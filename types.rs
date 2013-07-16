@@ -68,17 +68,17 @@ pub enum FKind {
 }
 
 pub struct MethodInfo {
-	return_type:~str,
+	return_type:@Type,
 	name:~str,
-	args:~[@ArgInfo]
+	args:~[ArgInfo]
 }
 
 
 pub struct CompInfo {
     cstruct: bool,
     name: ~str,
-    fields: ~[@FieldInfo]
-//	methods: ~[~MethodInfo]
+    fields: ~[@FieldInfo],
+	methods: ~[@MethodInfo]
 }
 
 
@@ -153,8 +153,8 @@ impl ToStr for VarInfo {
 pub fn mk_compinfo(name: ~str, cstruct: bool, fields: ~[@FieldInfo]) -> @mut CompInfo {
     return @mut CompInfo { cstruct: cstruct,
                            name: name,
-                           fields: fields
-//							methods: ~[]
+                           fields: fields,
+							methods: ~[]
                          };
 }
 
