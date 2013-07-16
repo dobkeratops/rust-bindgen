@@ -25,6 +25,7 @@ enum ParseResult {
     ParseErr(~str)
 }
 
+
 fn parse_args(args: &[~str]) -> ParseResult {
     let mut clang_args = ~[];
     let args_len = args.len();
@@ -326,11 +327,11 @@ fn read_function_args(cursor: &Cursor, ctx: @mut BindGenCtx)->~[ArgInfo] {
 
 fn debug_show_args(args:&[ArgInfo]) {
 	// TODO - use more idiomatic rust iteration
-	println(fmt!("\tnum args = %u\n", args.len()));
+	//dblog!("\tnum args = %u\n", args.len());
 	let mut i=0;
 	while i<args.len() {
 		let (ref argName,argType)=args[i];
-		println(fmt!("\t\targ %u %s:%s\n",i,*argName,argType.to_str()));
+		//dblog!("\t\targ %u %s:%s\n",i,*argName,argType.to_str());
 		i+=1;
 	}
 }
@@ -347,7 +348,7 @@ fn visit_struct(cursor: &Cursor,
 		}
 		CXCursor_CXXMethod=>{
 			use types::*;
-			println(fmt!("\tmember function %s\n", cursor.spelling()));
+			//dblog!("\tmember function %s\n", cursor.spelling());
 			let args = read_function_args(cursor, ctx);
 			debug_show_args(args);
 			ci.methods.push(//mk_methodinfo(ty,name,args)
@@ -359,7 +360,7 @@ fn visit_struct(cursor: &Cursor,
 			);
 		}
 		_=>{
-			println(fmt!("\tstruct member unknown %s\n", cursor.spelling()));
+			//dblog!("\tstruct member unknown %s\n", cursor.spelling());
 		}
 	}
     return CXChildVisit_Continue;
@@ -402,10 +403,10 @@ fn visit_top<'r>(cur: &'r Cursor,
     if !match_pattern(ctx, cursor) {
         return CXChildVisit_Continue;
     }
-	let mut indent= ~"";
-	for depth.times { indent.append("\t");}
+	//let mut indent= ~"";
+	//for depth.times { indent.append("\t");}
+	//dblog!("%svisit -%s\n", indent,cursor.spelling());
 
-	println(fmt!("%svisit -%s\n", indent,cursor.spelling()));
     match cursor.kind() {
       CXCursor_StructDecl => {
         do fwd_decl(ctx, cursor) || {
