@@ -327,7 +327,7 @@ pub fn type_size(ty: @Type) -> uint {
             ILong | IULong => 4,
             ILongLong | IULongLong => 8
         },
-        TFloat(k) => match k {
+        TFloat(k) => match k {	
             FFloat => 4,
             FDouble => 8
         },
