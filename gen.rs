@@ -138,8 +138,14 @@ pub fn methods_to_impl_rs(ctx:&mut GenCtx, ci:&CompInfo)-> ~ast::item_ {
 		// generate propper function body ...
 		// TODO- not convinced this isn't easier generating text..
 		// but with the ast, if it changes..
-		let method_args=cfunc_args_to_rs(ctx, &m.args);
-		let method_arg_exprs=do m.args.map|&(ref name,_)|{
+		let (method_args,arg_names)=cfunc_args_to_rs(ctx, &m.args);
+//		let method_arg_exprs=do m.args.map|&(ref name,_)|{
+//			mk_expr_ident(ctx, *name)
+//		};
+//		let method_arg_exprs=do m.args.map|&(ref name,_)|{
+//			mk_expr_ident(ctx, *name)
+//		};
+		let method_arg_exprs=do arg_names.map|name|{
 			mk_expr_ident(ctx, *name)
 		};
 		
@@ -691,8 +697,9 @@ fn cvar_to_rs(ctx: &mut GenCtx, name: ~str, ty: @Type) -> @ast::foreign_item {
 }
 
 
-fn cfunc_args_to_rs(ctx:&mut GenCtx, src_args:&~[(~str,@Type)]) ->~[ast::arg] {
+fn cfunc_args_to_rs(ctx:&mut GenCtx, src_args:&~[(~str,@Type)]) ->(~[ast::arg],~[~str]) {
     let mut unnamed = 0;
+	let mut arg_names=~[];
     let rs_args = do src_args.map |arg| {
 		let (n, t) = copy *arg;
 
@@ -702,6 +709,7 @@ fn cfunc_args_to_rs(ctx:&mut GenCtx, src_args:&~[(~str,@Type)]) ->~[ast::arg] {
 		} else {
 		    rust_id(ctx, n).first()
 		};
+		arg_names.push(copy arg_name);
 
 		let arg_ty = cty_to_rs(ctx, t);
 
@@ -726,7 +734,7 @@ fn cfunc_args_to_rs(ctx:&mut GenCtx, src_args:&~[(~str,@Type)]) ->~[ast::arg] {
 		    id: ctx.ext_cx.next_id()
 		}
 	};
-	rs_args
+	(rs_args,arg_names)
 }
 
 fn mk_expr(ctx:&mut GenCtx, e:~ast::expr_)->ast::expr {
@@ -752,7 +760,7 @@ fn cfunc_to_rs(ctx: &mut GenCtx, name: ~str, rty: @Type,
 
     let decl = ast::foreign_item_fn(
         ast::fn_decl {
-            inputs: cfunc_args_to_rs(ctx,&aty),
+            inputs: {let (a,_)=cfunc_args_to_rs(ctx,&aty);a},
             output: ret,
             cf: ast::return_val
         },
