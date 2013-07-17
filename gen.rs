@@ -516,8 +516,14 @@ fn cstruct_to_rs(ctx: &mut GenCtx, name: ~str, fields: ~[@FieldInfo]) -> @ast::i
         } else {
             rust_type_id(ctx, copy f.name)
         };
-
-        let f_ty = cty_to_rs(ctx, f.ty);
+		//println(fmt!("%s.%s ntp=%u\n",name ,f.name, f.type_params.len()));
+		let f_ty=
+			if f.type_params.len()>0{ 
+				//println("instantiating tempalte:"+f.type_params.to_str());
+		        cty_to_rs_templated(ctx, f.ty, f.type_params)
+			}else{
+		        cty_to_rs(ctx, f.ty)
+			};
 
         @dummy_spanned(ast::struct_field_ {
             kind: ast::named_field(
@@ -820,7 +826,8 @@ fn cty_to_rs(ctx: &mut GenCtx, ty: @Type) -> ast::Ty {
             let id = rust_type_id(ctx, copy ti.name);
             mk_ty(ctx, id)
         },
-        TComp(ci) => {
+		TClassTemplateInstance{def:ci,type_params:_}
+        |TComp(ci) => {
             ci.name = unnamed_name(ctx, copy ci.name);
             if ci.cstruct {
                 mk_ty(ctx, struct_name(copy ci.name))
@@ -838,16 +845,41 @@ fn cty_to_rs(ctx: &mut GenCtx, ty: @Type) -> ast::Ty {
     };
 }
 
-fn mk_ty(ctx: &mut GenCtx, name: ~str) -> ast::Ty {
+fn cty_to_rs_templated(ctx: &mut GenCtx, ty: @Type,type_params:&[~str]) -> ast::Ty {
+    return match *ty {
+		TClassTemplateInstance{def:ci,type_params:_}
+        |TComp(ci) => {
+            ci.name = unnamed_name(ctx, copy ci.name);
+            if ci.cstruct {
+                mk_ty_templated(ctx, struct_name(copy ci.name), type_params)
+            } else {
+                mk_ty(ctx, union_name(copy ci.name))
+            }
+        },
+		_ => {
+			println("type is wrong \n");
+			mk_ty(ctx,~"c_void")
+		}
+		
+	}
+}
+
+fn mk_ty(ctx: &mut GenCtx, name: &str) -> ast::Ty { mk_ty_templated(ctx,name,~[]) }
+
+fn mk_ty_templated(ctx: &mut GenCtx, name: &str, type_params:&[~str]) -> ast::Ty {
+	let ty_arg_list = do type_params.map|x|{
+		mk_ty(ctx,*x)
+	};
     let ty = ast::ty_path(
         ast::Path {
             span: dummy_sp(),
             global: false,
             idents: ~[ctx.ext_cx.ident_of(name)],
             rp: None,
-            types: ~[]
+            types: ty_arg_list,
         },
         option::None,
+		
         ctx.ext_cx.next_id()
     );
 

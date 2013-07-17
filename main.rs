@@ -261,6 +261,7 @@ fn conv_ptr_ty(ctx: @mut BindGenCtx, ty: &cx::Type, cursor: &Cursor) -> @il::Typ
 }
 
 fn conv_decl_ty(ctx: @mut BindGenCtx, cursor: &Cursor) -> @il::Type {
+//	is_template(ctx,cursor);
     return match cursor.kind() {
       CXCursor_StructDecl => {
         let decl = decl_name(ctx, cursor);
@@ -284,6 +285,31 @@ fn conv_decl_ty(ctx: @mut BindGenCtx, cursor: &Cursor) -> @il::Type {
       }
       _ => @TVoid
     };
+}
+
+fn has_got_template_ref(cursor: &Cursor)-> bool {
+	let mut result=false;
+	do cursor.visit |c,_| {
+		match c.kind() {
+			CXCursor_TemplateRef=>	{
+				result=true;
+				println(fmt!("%s has template instance arguemnts\n", cursor.spelling()));
+				CXChildVisit_Break
+			},
+			_=>CXChildVisit_Continue
+		}
+	}
+	result
+}
+
+fn is_template(ctx:@mut BindGenCtx, cursor: &Cursor)->bool {
+
+	let ret=match cursor.kind() {
+		CXCursor_ClassTemplate => true,
+		_ => false,
+	};
+	println(fmt!("testing if %s:%s a template:%i", cursor.spelling(),kind_to_str(cursor.kind())if ret{1}else{0}));
+	ret
 }
 
 fn conv_ty(ctx: @mut BindGenCtx, ty: &cx::Type, cursor: &Cursor) -> @il::Type {
@@ -343,33 +369,30 @@ fn debug_show_args(args:&[ArgInfo]) {
 	}
 }
 
-fn read_template_args(cursor:&Cursor,ctx:@mut BindGenCtx) 
+fn read_template_instance_type_params(ctx:@mut BindGenCtx,cursor:&Cursor)->
+	~[~str]
 {
+	// yuk imperative style.
+	// want to write 
+	//	cursor.children.filter(|x|{x.kind()==CXCursor_TypeRef}).map|x|(ctx.get_ident(x))
+	let mut type_params=~[];
+	// todo: for default template arguments this would need the definition
+	//
     do cursor.visit |c, _| {
 		match c.kind() {
-			CXCursor_TemplateRef => {
-//				let args=c.args();
-				println("(TemplateRef");
-				let numArgs=unsafe {
-					clang_Cursor_getNumArguments(**c)
-				};
-				println(fmt!("%s:TemplateRef:.args=%i", c.spelling(),numArgs as int)); 
-				
-				do c.visit |s,_| {
-					match s.kind() {
-						CXCursor_TemplateTypeParameter => {
-								println(fmt!("TemplateTypeParameter:%s,", s.spelling()));
-						},
-						_ => {println(fmt!("%s:%u", s.spelling(),s.kind() as uint));}
-					}
-					CXChildVisit_Continue
-				};
-			println(")");
-			},
-			_ => {println(fmt!("%s:%u", c.spelling(),c.kind() as uint));}
+			CXCursor_TypeRef => {
+
+				type_params.push(c.spelling());
+			}
+//			CXCursor_TemplateRef => {
+//				.. todo: grab this and return it with the params..
+//				.. we will need it for default values ?
+//			},
+			_ => ()
 		};
 		CXChildVisit_Continue
 	};
+	type_params
 }
 
 
@@ -380,14 +403,11 @@ fn visit_struct(cursor: &Cursor,
     let name = cursor.spelling();
 
 	match cursor.kind() {
-		CXCursor_TemplateRef => {
-			let template_args = read_template_args(cursor,ctx);
-
-		}
     	CXCursor_FieldDecl=>{
 		    let ty = conv_ty(ctx, &cursor.cur_type(), cursor);
+			let type_params = read_template_instance_type_params(ctx,cursor);
 
-		    let field = mk_fieldinfo(name, ty, None);
+		    let field = mk_fieldinfo_templated(name, ty, None,type_params);
 		    ci.fields.push(field);
 		}
 		CXCursor_CXXMethod=>{

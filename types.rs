@@ -29,7 +29,7 @@ pub enum Type {
     TNamed(@mut TypeInfo),
     TComp(@mut CompInfo),
     TEnum(@mut EnumInfo),
-//	TClassTemplateInstance(@CompInfo,~[@Type])
+	TClassTemplateInstance{def:@mut CompInfo,type_params:~[@Type]}
 }
 //?? didn't work as impl ToStr for Type ?
 impl Type {
@@ -87,7 +87,8 @@ pub struct CompInfo {
 pub struct FieldInfo {
     name: ~str,
     ty: @Type,
-    bit: Option<uint>
+    bit: Option<uint>,
+	type_params:~[~str]
 }
 
 
@@ -164,9 +165,19 @@ pub fn mk_compinfo(name: ~str, cstruct: bool, fields: ~[@FieldInfo]) -> @mut Com
 pub fn mk_fieldinfo(name: ~str, ty: @Type, bit: Option<uint>) -> @FieldInfo {
     return @FieldInfo { name: name,
                         ty: ty,
-                        bit: bit
+                        bit: bit,
+						type_params:~[]
                       };
 }
+
+pub fn mk_fieldinfo_templated(name: ~str, ty: @Type, bit: Option<uint>,tps:~[~str]) -> @FieldInfo {
+    return @FieldInfo { name: name,
+                        ty: ty,
+                        bit: bit,
+						type_params:tps
+                      };
+}
+
 
 pub fn mk_enuminfo(name: ~str, kind: IKind, items: ~[@EnumItem]) -> @mut EnumInfo {
     return @mut EnumInfo { name: name,
@@ -251,6 +262,11 @@ pub fn type_align(ty: @Type) -> uint {
         TVoid => 0,
         TFunc(_, _, _) => 0,
         TMemberFunc(_,_,_,_) => 0,
+		TClassTemplateInstance{def:_,type_params:_}=>{
+			println("WARNING TODO - CALCULATE TEMPLATED TYPE ALIGNMENT");
+			8
+		}
+
     };
 }
 
@@ -279,8 +295,27 @@ pub fn type_align(ty: @Type) -> uint {
         },
         TEnum(_) => 4,
         TVoid => 0,
-        TFunc(_, _, _) => 0
+        TFunc(_, _, _) => 0,
+		TClassTemplateInstance{def:_,type_params_}=>{
+			println("WARNING TODO - CALCULATE TEMPLATED TYPE ALIGNMENT");
+			8
+		}
+
     };
+}
+
+pub fn ccomp_size(ci:&CompInfo)->uint {
+	if ci.cstruct {
+		let fs = copy ci.fields;	// todo, this should not be needed?
+		do fs.iter().fold(0) |s, t| {
+			align(s, t.ty) + type_size(t.ty)
+		}
+	} else {
+		let fs = copy ci.fields;
+		do fs.iter().fold(0) |s, t| {
+			uint::max(s, type_size(t.ty))
+		}
+	}
 }
 
 #[cfg(target_arch="x86_64")]
@@ -300,23 +335,15 @@ pub fn type_size(ty: @Type) -> uint {
         TPtr(*) => 8,
         TArray(t, s) => type_size(t) * s,
         TNamed(t) => type_size(t.ty),
-        TComp(ci) => if ci.cstruct {
-            let fs = copy ci.fields;
-            let size = do fs.iter().fold(0) |s, t| {
-                align(s, t.ty) + type_size(t.ty)
-            };
-            align(size, ty)
-        } else {
-            let fs = copy ci.fields;
-            let size = do fs.iter().fold(0) |s, t| {
-                uint::max(s, type_size(t.ty))
-            };
-            align(size, ty)
-        },
+        TComp(ci) => align(ccomp_size(ci), ty),
         TEnum(_) => 4,
         TVoid => 0,
         TFunc(_, _, _) => 0,
-		TMemberFunc(_,_,_,_)=>0
+		TMemberFunc(_,_,_,_)=>0,
+		TClassTemplateInstance{def:_,type_params:_}=>{
+			println("WARNING TODO - CALCULATE TEMPLATED TYPE SIZE");
+			0
+		}
     };
 }
 
