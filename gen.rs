@@ -193,13 +193,13 @@ pub fn methods_to_impl_rs(ctx:&mut GenCtx, ci:&CompInfo)-> ~ast::item_ {
 	root_item
 }
 
-fn mk_item(ctx:&mut GenCtx, name:&str, item: &ast::item_)->@ast::item {
+fn mk_item(ctx:&mut GenCtx, name:&str, item: &ast::item_, v:ast::visibility)->@ast::item {
 	@ast::item {
 		ident: ctx.ext_cx.ident_of(name),
 		attrs:~[],
 		id: ctx.ext_cx.next_id(),
 		node: copy *item,	
-		vis:	ast::public,
+		vis:	v,
 		span: dummy_sp()
 	}
 }
@@ -300,7 +300,7 @@ pub fn gen_rs(out: @io::Writer, link: &Option<~str>, globs: &[Global]) {
     defs.push(mk_extern(&mut ctx, link, vars, funcs+methods));
 
 	for impls.iter().advance|x| {
-		defs.push(mk_item(&mut ctx,"",*x));
+		defs.push(mk_item(&mut ctx,"",*x, ast::inherited));
 	}
 
     let crate = @dummy_spanned(ast::crate_ {

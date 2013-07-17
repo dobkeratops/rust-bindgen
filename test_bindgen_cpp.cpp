@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <malloc.h>
+
 #include "test_bindgen_cpp.h"
 
 
-
+/*
 #define OFS(base,member) ((size_t)(&(base->member))-(size_t)(base))
 extern "C" void Foo_bar(struct Foo* self, int x, float y) {
 	printf("C++ says sizeof *self=%d\n",sizeof(*self));
@@ -45,4 +46,4 @@ extern "C" float* foo2(int, const char* txt[7], int*) {
 extern "C" void foo3(int) {
 
 }
-
+*/

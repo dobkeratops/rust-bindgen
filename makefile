@@ -3,8 +3,11 @@ bindgen: bindgen.rs gen.rs main.rs types.rs clangll.rs clang.rs
 
 testcpp: bindgen
 	./bindgen -emit-clang-ast -x c++ test_bindgen_cpp.h
+	echo "use cppemu::*;\n" > test_bindgen_cpp.rs
+	./bindgen -x c++ test_bindgen_cpp.h >> test_bindgen_cpp.rs
+	
 
-test:
+test: testcpp
 	g++ test_bindgen_cpp.cpp -c
 	ar rcs libtest_bindgen_cpp.a test_bindgen_cpp.o
 	rustc testcpp_from_rs.rs
