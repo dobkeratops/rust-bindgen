@@ -6,6 +6,7 @@ use types::*;
 use cx = clang;
 use clang::*;
 use clang::ll::*;
+use clang_sym::*;
 use gen::*;
 
 struct BindGenCtx {
@@ -16,7 +17,8 @@ struct BindGenCtx {
     name: HashMap<Cursor, Global>,
     globals: ~[Global],
     builtin_defs: ~[Cursor],
-    builtin_names: HashSet<~str>
+    builtin_names: HashSet<~str>,
+	emit_ast: bool
 }
 
 enum ParseResult {
@@ -34,6 +36,7 @@ fn parse_args(args: &[~str]) -> ParseResult {
     let mut pat = ~[];
     let mut link = None;
     let mut builtins = false;
+	let mut emit_ast = false;
 
     if args_len == 0u {
         return CmdUsage;
@@ -45,6 +48,10 @@ fn parse_args(args: &[~str]) -> ParseResult {
             ~"--help" | ~"-h" => {
                 return CmdUsage;
             }
+			~"-emit-clang-ast" => {
+				emit_ast=true;
+				ix+=1u;
+			}
             ~"-o" => {
                 if ix + 1u >= args_len {
                     return ParseErr(~"Missing output filename");
@@ -88,7 +95,8 @@ fn parse_args(args: &[~str]) -> ParseResult {
                                 name: HashMap::new(),
                                 globals: ~[],
                                 builtin_defs: ~[],
-                                builtin_names: builtin_names()
+                                builtin_names: builtin_names(),
+								emit_ast:emit_ast
                               };
 
     return ParseOk(clang_args, ctx);
@@ -338,39 +346,47 @@ fn debug_show_args(args:&[ArgInfo]) {
 
 fn read_template_args(cursor:&Cursor,ctx:@mut BindGenCtx) 
 {
-	println("<");
     do cursor.visit |c, _| {
 		match c.kind() {
 			CXCursor_TemplateRef => {
-				println(fmt!("TemplateRef:%s,", c.spelling())); 
+//				let args=c.args();
+				println("(TemplateRef");
+				let numArgs=unsafe {
+					clang_Cursor_getNumArguments(**c)
+				};
+				println(fmt!("%s:TemplateRef:.args=%i", c.spelling(),numArgs as int)); 
+				
 				do c.visit |s,_| {
 					match s.kind() {
 						CXCursor_TemplateTypeParameter => {
 								println(fmt!("TemplateTypeParameter:%s,", s.spelling()));
 						},
-						_ => {println(fmt!("%s,", c.spelling()));}
+						_ => {println(fmt!("%s:%u", s.spelling(),s.kind() as uint));}
 					}
 					CXChildVisit_Continue
 				};
+			println(")");
 			},
-			_ => {println(fmt!("%s,", c.spelling()));}
+			_ => {println(fmt!("%s:%u", c.spelling(),c.kind() as uint));}
 		};
 		CXChildVisit_Continue
 	};
-	println(">");
 }
+
 
 fn visit_struct(cursor: &Cursor,
                 ctx: @mut BindGenCtx,
 				ci: &mut CompInfo
 				) -> Enum_CXVisitorResult {
     let name = cursor.spelling();
-	println(fmt!("hello from visit_struct" ));
+
 	match cursor.kind() {
-		CXCursor_TemplateRef => {println(fmt!("TemplateRef:%s,", cursor.spelling()));},
+		CXCursor_TemplateRef => {
+			let template_args = read_template_args(cursor,ctx);
+
+		}
     	CXCursor_FieldDecl=>{
 		    let ty = conv_ty(ctx, &cursor.cur_type(), cursor);
-			let template_args = read_template_args(cursor,ctx);
 
 		    let field = mk_fieldinfo(name, ty, None);
 		    ci.fields.push(field);
@@ -389,9 +405,10 @@ fn visit_struct(cursor: &Cursor,
 			);
 		}
 		_=>{
-			//dblog!("\tstruct member unknown %s\n", cursor.spelling());
 		}
 	}
+	cursor.visit(|c, _| visit_struct(c, ctx, ci));
+
     return CXChildVisit_Continue;
 }
 
@@ -552,6 +569,9 @@ fn main() {
             }
 
             let cursor = unit.cursor();
+			if ctx.emit_ast {
+	            cursor.visit(|cur, parent| ast_dump(cur,0));
+			}			
             cursor.visit(|cur, parent| visit_top(cur, parent, ctx,0));
                 
             while !ctx.builtin_defs.is_empty() {

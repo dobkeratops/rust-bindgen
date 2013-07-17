@@ -259,7 +259,9 @@ pub fn gen_rs(out: @io::Writer, link: &Option<~str>, globs: &[Global]) {
 						)
 					)
 				}
-				impls.push(methods_to_impl_rs(&mut ctx,&*ci));
+				if ci.methods.len()>0 {
+					impls.push(methods_to_impl_rs(&mut ctx,&*ci));
+				}
             },
             GEnumDecl(ei) => {
                 ei.name = unnamed_name(&mut ctx, copy ei.name);
