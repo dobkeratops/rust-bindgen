@@ -7,7 +7,7 @@ testcpp: bindgen
 	./bindgen -x c++ test_bindgen_cpp.h >> test_bindgen_cpp.rs
 	
 
-test: testcpp
+test: 
 	g++ test_bindgen_cpp.cpp -c
 	ar rcs libtest_bindgen_cpp.a test_bindgen_cpp.o
 	rustc testcpp_from_rs.rs
