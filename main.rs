@@ -335,14 +335,43 @@ fn debug_show_args(args:&[ArgInfo]) {
 		i+=1;
 	}
 }
+
+fn read_template_args(cursor:&Cursor,ctx:@mut BindGenCtx) 
+{
+	println("<");
+    do cursor.visit |c, _| {
+		match c.kind() {
+			CXCursor_TemplateRef => {
+				println(fmt!("TemplateRef:%s,", c.spelling())); 
+				do c.visit |s,_| {
+					match s.kind() {
+						CXCursor_TemplateTypeParameter => {
+								println(fmt!("TemplateTypeParameter:%s,", s.spelling()));
+						},
+						_ => {println(fmt!("%s,", c.spelling()));}
+					}
+					CXChildVisit_Continue
+				};
+			},
+			_ => {println(fmt!("%s,", c.spelling()));}
+		};
+		CXChildVisit_Continue
+	};
+	println(">");
+}
+
 fn visit_struct(cursor: &Cursor,
                 ctx: @mut BindGenCtx,
 				ci: &mut CompInfo
 				) -> Enum_CXVisitorResult {
     let name = cursor.spelling();
+	println(fmt!("hello from visit_struct" ));
 	match cursor.kind() {
+		CXCursor_TemplateRef => {println(fmt!("TemplateRef:%s,", cursor.spelling()));},
     	CXCursor_FieldDecl=>{
 		    let ty = conv_ty(ctx, &cursor.cur_type(), cursor);
+			let template_args = read_template_args(cursor,ctx);
+
 		    let field = mk_fieldinfo(name, ty, None);
 		    ci.fields.push(field);
 		}
