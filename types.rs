@@ -28,7 +28,8 @@ pub enum Type {
 	TMemberFunc(@ReturnType,	@ReceiverType,~[ArgInfo],	bool),
     TNamed(@mut TypeInfo),
     TComp(@mut CompInfo),
-    TEnum(@mut EnumInfo)
+    TEnum(@mut EnumInfo),
+//	TClassTemplateInstance(@CompInfo,~[@Type])
 }
 //?? didn't work as impl ToStr for Type ?
 impl Type {
@@ -78,7 +79,8 @@ pub struct CompInfo {
     cstruct: bool,
     name: ~str,
     fields: ~[@FieldInfo],
-	methods: ~[@MethodInfo]
+	methods: ~[@MethodInfo],
+	type_params: ~[~str]
 }
 
 
@@ -154,7 +156,8 @@ pub fn mk_compinfo(name: ~str, cstruct: bool, fields: ~[@FieldInfo]) -> @mut Com
     return @mut CompInfo { cstruct: cstruct,
                            name: name,
                            fields: fields,
-							methods: ~[]
+							methods: ~[],
+							type_params:~[]
                          };
 }
 
