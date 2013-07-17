@@ -1,4 +1,4 @@
-bindgen: bindgen.rs gen.rs main.rs types.rs clangll.rs clang_sym.rs
+bindgen: bindgen.rs gen.rs main.rs types.rs clangll.rs clang.rs
 	rustc bindgen.rs -L$(LLVM_LIB)
 
 testcpp: bindgen
@@ -10,6 +10,6 @@ test:
 	rustc testcpp_from_rs.rs
 
 clean:
+	rm ./bindgen
 	rm *.o
 	rm *.a
-	rm ./bindgen

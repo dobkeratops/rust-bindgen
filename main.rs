@@ -6,7 +6,6 @@ use types::*;
 use cx = clang;
 use clang::*;
 use clang::ll::*;
-use clang_sym::*;
 use gen::*;
 
 struct BindGenCtx {
