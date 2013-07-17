@@ -4,7 +4,7 @@
 #include "test_bindgen_cpp.h"
 
 
-/*
+
 #define OFS(base,member) ((size_t)(&(base->member))-(size_t)(base))
 extern "C" void Foo_bar(struct Foo* self, int x, float y) {
 	printf("C++ says sizeof *self=%d\n",sizeof(*self));
@@ -29,7 +29,7 @@ const char* Foo::getBaz(const void* src) {
 	printf("%s %d %.3f\n",__FUNCTION__,this->x,this->y);
 }
 
-extern "C" const char* Nested_s_getOrange(struct Nested_s*, int x, float y) {
+extern "C" const char* Foo_getOrange(struct Nested_s*, int x, float y) {
 	printf("hello from c++ %s\n",__FUNCTION__);
 	return	NULL;
 }
@@ -46,4 +46,4 @@ extern "C" float* foo2(int, const char* txt[7], int*) {
 extern "C" void foo3(int) {
 
 }
-*/
+
